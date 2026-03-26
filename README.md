@@ -75,3 +75,17 @@ Endpoints:
 - `GET /health`
 - `GET /v1/search?q=年轻化&top_k=3`
 - `POST /v1/retrieve` with JSON `{"query":"年轻化","top_k":3}`
+
+Minimal client example:
+
+```bash
+C:\Users\yichen\miniconda3\python.exe examples\agent_client_example.py
+```
+
+Minimal `curl` example:
+
+```bash
+curl -X POST "http://127.0.0.1:8787/v1/retrieve" ^
+  -H "Content-Type: application/json" ^
+  -d "{\"query\":\"年轻化\",\"top_k\":3}"
+```
