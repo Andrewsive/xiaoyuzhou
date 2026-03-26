@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import typer
@@ -16,6 +17,15 @@ app = typer.Typer(help="Podcast knowledge base pipeline")
 
 def _runner(config_path: Path) -> PipelineRunner:
     return PipelineRunner(load_config(config_path))
+
+
+def _safe_echo(text: str) -> None:
+    try:
+        typer.echo(text)
+    except UnicodeEncodeError:
+        encoding = getattr(sys.stdout, "encoding", None) or "utf-8"
+        sanitized = text.encode(encoding, errors="backslashreplace").decode(encoding, errors="ignore")
+        typer.echo(sanitized)
 
 
 @app.command("preflight")
@@ -196,4 +206,4 @@ def agent_answer(
     config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
 ) -> None:
     payload = answer_with_knowledge_base(config_path=config, question=question, top_k=top_k)
-    typer.echo(print_agent_answer(payload))
+    _safe_echo(print_agent_answer(payload))

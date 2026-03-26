@@ -1,4 +1,4 @@
-from podcast_pipeline.knowledge_agent import fallback_answer
+from podcast_pipeline.knowledge_agent import _resolve_llm_settings, fallback_answer
 
 
 def test_fallback_answer_lists_sources() -> None:
@@ -12,3 +12,20 @@ def test_fallback_answer_lists_sources() -> None:
     assert "EP001" in answer
     assert "第一条摘要" in answer
     assert "EP002" in answer
+
+
+def test_resolve_llm_settings_reuses_embedding_provider() -> None:
+    settings = _resolve_llm_settings(
+        {
+            "LLM_API_KEY": "",
+            "LLM_BASE_URL": "",
+            "LLM_MODEL": "",
+            "EMBEDDING_API_KEY": "embedding-key",
+            "EMBEDDING_BASE_URL": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        }
+    )
+    assert settings == (
+        "embedding-key",
+        "https://dashscope.aliyuncs.com/compatible-mode/v1",
+        "qwen-plus",
+    )

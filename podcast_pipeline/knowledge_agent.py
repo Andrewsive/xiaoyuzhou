@@ -22,14 +22,46 @@ Rules:
 """
 
 
-def load_llm_env(config_path: Path) -> tuple[str, str, str] | None:
-    load_dotenv(config_path.parent / ".env")
-    api_key = os.getenv("LLM_API_KEY", "").strip()
-    base_url = os.getenv("LLM_BASE_URL", "").strip()
-    model = os.getenv("LLM_MODEL", "").strip()
+def _default_model_for_base_url(base_url: str) -> str | None:
+    normalized = base_url.strip().lower()
+    if "dashscope.aliyuncs.com/compatible-mode/v1" in normalized:
+        return "qwen-plus"
+    if "api.openai.com/v1" in normalized:
+        return "gpt-4o-mini"
+    return None
+
+
+def _resolve_llm_settings(env: dict[str, str]) -> tuple[str, str, str] | None:
+    api_key = env.get("LLM_API_KEY", "").strip()
+    base_url = env.get("LLM_BASE_URL", "").strip()
+    model = env.get("LLM_MODEL", "").strip()
+    if api_key and base_url and model:
+        return api_key, base_url, model
+
+    # Reuse the embedding provider when the key is shared across compatible APIs.
+    embedding_api_key = env.get("EMBEDDING_API_KEY", "").strip()
+    embedding_base_url = env.get("EMBEDDING_BASE_URL", "").strip()
+    if not embedding_api_key:
+        return None
+
+    api_key = api_key or embedding_api_key
+    base_url = base_url or embedding_base_url
+    model = model or _default_model_for_base_url(base_url or embedding_base_url) or ""
     if api_key and base_url and model:
         return api_key, base_url, model
     return None
+
+
+def load_llm_env(config_path: Path) -> tuple[str, str, str] | None:
+    load_dotenv(config_path.parent / ".env")
+    env = {
+        "LLM_API_KEY": os.getenv("LLM_API_KEY", ""),
+        "LLM_BASE_URL": os.getenv("LLM_BASE_URL", ""),
+        "LLM_MODEL": os.getenv("LLM_MODEL", ""),
+        "EMBEDDING_API_KEY": os.getenv("EMBEDDING_API_KEY", ""),
+        "EMBEDDING_BASE_URL": os.getenv("EMBEDDING_BASE_URL", ""),
+    }
+    return _resolve_llm_settings(env)
 
 
 def _truncate(text: str, limit: int = 160) -> str:

@@ -20,6 +20,11 @@ C:\Users\yichen\miniconda3\python.exe -m pip install -r requirements.txt
 - `EMBEDDING_BASE_URL`
 - `EMBEDDING_MODEL`
 
+If you only fill the embedding-compatible provider, `agent-answer` will try to reuse that same compatible API for chat:
+
+- DashScope compatible mode defaults to `qwen-plus`
+- OpenAI compatible mode defaults to `gpt-4o-mini`
+
 3. Update `config.yaml`:
 
 - For Xiaoyuzhou podcast URLs, the pipeline will try the public web page first.
