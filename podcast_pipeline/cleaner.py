@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import json
+import os
+import re
 from pathlib import Path
 
 from .config import AppConfig
@@ -71,10 +73,15 @@ def group_segments(segments: list[TranscriptSegment], *, max_chars: int) -> list
 class TranscriptCleaner:
     def __init__(self, config: AppConfig):
         self.config = config
-        self.client = OpenAICompatibleClient(
-            api_key=getenv_required(config.cleaner.api_key_env),
-            base_url=config.cleaner_base_url(),
-        )
+        provider = config.cleaner.provider.lower()
+        has_llm_key = bool(os.getenv(config.cleaner.api_key_env, "").strip())
+        self.mode = "heuristic" if provider == "heuristic" or (provider == "auto" and not has_llm_key) else "llm"
+        self.client = None
+        if self.mode == "llm":
+            self.client = OpenAICompatibleClient(
+                api_key=getenv_required(config.cleaner.api_key_env),
+                base_url=config.cleaner_base_url(),
+            )
 
     def clean_to_files(self, *, transcript_path: Path, jsonl_output_path: Path, md_output_path: Path) -> tuple[Path, Path]:
         segments = load_segments_from_transcript_payload(transcript_path)
@@ -106,15 +113,18 @@ class TranscriptCleaner:
 
     def _clean_group(self, group: list[TranscriptSegment]) -> CleanSegment:
         raw_text = "\n".join(f"[{seg.start_ms}-{seg.end_ms}] (speaker={seg.speaker}) {seg.text}" for seg in group)
-        response = self.client.chat(
-            model=self.config.cleaner_model(),
-            messages=[
-                {"role": "system", "content": SYSTEM_PROMPT},
-                {"role": "user", "content": raw_text},
-            ],
-            temperature=self.config.cleaner.temperature,
-        )
-        parsed = parse_json_response(response)
+        if self.mode == "llm":
+            response = self.client.chat(
+                model=self.config.cleaner_model(),
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": raw_text},
+                ],
+                temperature=self.config.cleaner.temperature,
+            )
+            parsed = parse_json_response(response)
+        else:
+            parsed = self._heuristic_clean(raw_text)
         speakers = sorted({segment.speaker for segment in group})
         return CleanSegment(
             chunk_id=sha1_text("|".join(segment.segment_id for segment in group)),
@@ -125,6 +135,21 @@ class TranscriptCleaner:
             keywords=[str(item).strip() for item in parsed.get("keywords", []) if str(item).strip()],
             summary=parsed.get("summary", "").strip(),
         )
+
+    def _heuristic_clean(self, text: str) -> dict[str, object]:
+        cleaned = re.sub(r"\[(\d+)-(\d+)\]\s+\(speaker=.*?\)\s*", "", text)
+        cleaned = cleaned.replace("那个", "").replace("就是", "").replace("然后", " ")
+        cleaned = re.sub(r"[ \t]+", " ", cleaned)
+        cleaned = re.sub(r"\n{2,}", "\n", cleaned)
+        cleaned = cleaned.strip()
+        summary = cleaned.split("。")[0].strip()
+        if not summary:
+            summary = cleaned[:80]
+        return {
+            "text": cleaned,
+            "summary": summary[:120],
+            "keywords": [],
+        }
 
     def _render_episode_markdown(self, segments: list[CleanSegment]) -> str:
         lines = ["# Episode Summary", "", "## Cleaned Segments", ""]

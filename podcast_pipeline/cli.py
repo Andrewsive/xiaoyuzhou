@@ -35,46 +35,89 @@ def sync(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=
 
 
 @app.command("download")
-def download(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False)) -> None:
+def download(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    limit: int | None = typer.Option(None, min=1),
+    episode_id: str | None = typer.Option(None),
+) -> None:
     runner = _runner(config)
     try:
-        typer.echo(json.dumps({"downloaded": runner.download_pending()}, ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                {"downloaded": runner.download_pending(limit=limit, episode_id=episode_id)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     finally:
         runner.close()
 
 
 @app.command("transcribe")
-def transcribe(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False)) -> None:
+def transcribe(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    limit: int | None = typer.Option(None, min=1),
+    episode_id: str | None = typer.Option(None),
+) -> None:
     runner = _runner(config)
     try:
-        typer.echo(json.dumps({"transcribed": runner.transcribe_pending()}, ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                {"transcribed": runner.transcribe_pending(limit=limit, episode_id=episode_id)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     finally:
         runner.close()
 
 
 @app.command("clean")
-def clean(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False)) -> None:
+def clean(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    limit: int | None = typer.Option(None, min=1),
+    episode_id: str | None = typer.Option(None),
+) -> None:
     runner = _runner(config)
     try:
-        typer.echo(json.dumps({"cleaned": runner.clean_pending()}, ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                {"cleaned": runner.clean_pending(limit=limit, episode_id=episode_id)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     finally:
         runner.close()
 
 
 @app.command("index")
-def index(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False)) -> None:
+def index(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    limit: int | None = typer.Option(None, min=1),
+    episode_id: str | None = typer.Option(None),
+) -> None:
     runner = _runner(config)
     try:
-        typer.echo(json.dumps({"indexed": runner.index_pending()}, ensure_ascii=False, indent=2))
+        typer.echo(
+            json.dumps(
+                {"indexed": runner.index_pending(limit=limit, episode_id=episode_id)},
+                ensure_ascii=False,
+                indent=2,
+            )
+        )
     finally:
         runner.close()
 
 
 @app.command("run-once")
-def run_once(config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False)) -> None:
+def run_once(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    limit: int | None = typer.Option(None, min=1),
+) -> None:
     runner = _runner(config)
     try:
-        typer.echo(runner.dump_json(runner.run_once()))
+        typer.echo(runner.dump_json(runner.run_once(limit=limit)))
     finally:
         runner.close()
 

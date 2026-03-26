@@ -25,6 +25,10 @@ C:\Users\yichen\miniconda3\python.exe -m pip install -r requirements.txt
 - For Xiaoyuzhou podcast URLs, the pipeline will try the public web page first
 - Replace `rsshub.base_url` with your own RSSHub deployment for Xiaoyuzhou, or
 - Set `podcasts[].rss_url` directly if you already have a working RSS URL
+- If no cloud keys are configured, the pipeline falls back to:
+  - local Whisper ASR
+  - heuristic transcript cleaning
+  - SQLite FTS search
 
 If you only have an episode URL, resolve it first:
 
@@ -41,6 +45,10 @@ C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline download
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline transcribe
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline clean
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline index
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline download --limit 1
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline transcribe --limit 1
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline clean --limit 1
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline index --limit 1
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline run-once
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline retry-failed
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline stats

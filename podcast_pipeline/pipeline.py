@@ -5,7 +5,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from .asr import DashScopeAsrProvider
+from .asr import build_asr_provider
 from .cleaner import TranscriptCleaner
 from .config import AppConfig
 from .db import (
@@ -75,9 +75,19 @@ class PipelineRunner:
                 errors.append({"podcast_id": podcast.podcast_id, "error": str(exc)})
         return {"discovered": discovered, "updated": updated, "errors": errors}
 
-    def download_pending(self) -> int:
+    def _episodes_for_stage(self, statuses: list[str], episode_id: str | None = None) -> list[Any]:
+        if episode_id:
+            episode = self.db.get_episode(episode_id)
+            if episode["status"] in statuses:
+                return [episode]
+            return []
+        return self.db.get_episodes_by_status(statuses)
+
+    def download_pending(self, limit: int | None = None, episode_id: str | None = None) -> int:
         count = 0
-        for episode in self.db.get_episodes_by_status([STATUS_DISCOVERED]):
+        for episode in self._episodes_for_stage([STATUS_DISCOVERED], episode_id=episode_id):
+            if limit is not None and count >= limit:
+                break
             run_id = self.db.mark_stage_started(episode["episode_id"], "download")
             try:
                 audio_path = self.downloader.download(
@@ -103,15 +113,17 @@ class PipelineRunner:
                 )
         return count
 
-    def transcribe_pending(self) -> int:
+    def transcribe_pending(self, limit: int | None = None, episode_id: str | None = None) -> int:
         count = 0
-        provider = DashScopeAsrProvider(self.config)
-        for episode in self.db.get_episodes_by_status([STATUS_DOWNLOADED]):
+        provider = build_asr_provider(self.config)
+        for episode in self._episodes_for_stage([STATUS_DOWNLOADED], episode_id=episode_id):
+            if limit is not None and count >= limit:
+                break
             run_id = self.db.mark_stage_started(episode["episode_id"], "transcribe")
             output_dir = ensure_directory(self.config.transcript_path / episode["podcast_id"])
             output_path = output_dir / f"{episode['episode_id']}.json"
             try:
-                provider.transcribe_to_file(audio_url=episode["audio_url"], output_path=output_path)
+                provider.transcribe_episode(dict(episode), output_path)
                 self.db.mark_stage_finished(
                     run_id,
                     episode["episode_id"],
@@ -130,10 +142,12 @@ class PipelineRunner:
                 )
         return count
 
-    def clean_pending(self) -> int:
+    def clean_pending(self, limit: int | None = None, episode_id: str | None = None) -> int:
         count = 0
         cleaner = TranscriptCleaner(self.config)
-        for episode in self.db.get_episodes_by_status([STATUS_TRANSCRIBED]):
+        for episode in self._episodes_for_stage([STATUS_TRANSCRIBED], episode_id=episode_id):
+            if limit is not None and count >= limit:
+                break
             run_id = self.db.mark_stage_started(episode["episode_id"], "clean")
             output_dir = ensure_directory(self.config.cleaned_path / episode["podcast_id"])
             jsonl_path = output_dir / f"{episode['episode_id']}.jsonl"
@@ -165,10 +179,12 @@ class PipelineRunner:
                 )
         return count
 
-    def index_pending(self) -> int:
+    def index_pending(self, limit: int | None = None, episode_id: str | None = None) -> int:
         count = 0
         indexer = VectorIndexer(self.config)
-        for episode in self.db.get_episodes_by_status([STATUS_CLEANED]):
+        for episode in self._episodes_for_stage([STATUS_CLEANED], episode_id=episode_id):
+            if limit is not None and count >= limit:
+                break
             run_id = self.db.mark_stage_started(episode["episode_id"], "index")
             try:
                 indexed_count = indexer.index_episode(
@@ -208,12 +224,12 @@ class PipelineRunner:
                 retried += 1
         return retried
 
-    def run_once(self) -> dict[str, int]:
+    def run_once(self, limit: int | None = None) -> dict[str, Any]:
         result = self.sync()
-        result["downloaded"] = self.download_pending()
-        result["transcribed"] = self.transcribe_pending()
-        result["cleaned"] = self.clean_pending()
-        result["indexed"] = self.index_pending()
+        result["downloaded"] = self.download_pending(limit=limit)
+        result["transcribed"] = self.transcribe_pending(limit=limit)
+        result["cleaned"] = self.clean_pending(limit=limit)
+        result["indexed"] = self.index_pending(limit=limit)
         return result
 
     def search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:

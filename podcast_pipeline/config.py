@@ -24,9 +24,11 @@ class RssHubConfig:
 
 @dataclass(slots=True)
 class DashScopeAsrConfig:
+    provider: str = "auto"
     api_key_env: str = "DASHSCOPE_API_KEY"
     base_url: str = "https://dashscope.aliyuncs.com"
     model: str = "fun-asr"
+    whisper_model: str = "base"
     poll_interval_seconds: int = 5
     timeout_seconds: int = 7200
     diarization_enabled: bool = True
@@ -36,6 +38,7 @@ class DashScopeAsrConfig:
 
 @dataclass(slots=True)
 class CleanerConfig:
+    provider: str = "auto"
     api_key_env: str = "LLM_API_KEY"
     base_url_env: str = "LLM_BASE_URL"
     model_env: str = "LLM_MODEL"
@@ -47,6 +50,7 @@ class CleanerConfig:
 
 @dataclass(slots=True)
 class EmbeddingConfig:
+    provider: str = "auto"
     api_key_env: str = "EMBEDDING_API_KEY"
     base_url_env: str = "EMBEDDING_BASE_URL"
     model_env: str = "EMBEDDING_MODEL"

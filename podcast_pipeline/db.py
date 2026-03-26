@@ -74,6 +74,19 @@ class PipelineDB:
                 finished_at TEXT,
                 FOREIGN KEY (episode_id) REFERENCES episodes(episode_id)
             );
+
+            CREATE VIRTUAL TABLE IF NOT EXISTS search_chunks USING fts5(
+                chunk_id UNINDEXED,
+                episode_id UNINDEXED,
+                podcast_id UNINDEXED,
+                episode_title UNINDEXED,
+                source_url UNINDEXED,
+                start_ms UNINDEXED,
+                end_ms UNINDEXED,
+                keywords UNINDEXED,
+                summary UNINDEXED,
+                text
+            );
             """
         )
         self.conn.commit()
