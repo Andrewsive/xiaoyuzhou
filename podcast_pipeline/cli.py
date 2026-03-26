@@ -7,6 +7,7 @@ import typer
 
 from .config import load_config
 from .pipeline import PipelineRunner
+from .xiaoyuzhou_web import XiaoyuzhouWebSource
 
 app = typer.Typer(help="Podcast knowledge base pipeline")
 
@@ -107,3 +108,27 @@ def search(
         typer.echo(json.dumps(runner.search(query=query, top_k=top_k), ensure_ascii=False, indent=2))
     finally:
         runner.close()
+
+
+@app.command("resolve-source")
+def resolve_source(url: str = typer.Argument(..., help="Xiaoyuzhou episode or podcast URL")) -> None:
+    source = XiaoyuzhouWebSource()
+    resolved = source.resolve_url(url)
+    typer.echo(
+        json.dumps(
+            {
+                "podcast_id": resolved.podcast_id,
+                "title": resolved.title,
+                "author": resolved.author,
+                "description": resolved.description,
+                "source_url": resolved.source_url,
+                "config_snippet": {
+                    "display_name": resolved.title,
+                    "source_url": resolved.source_url,
+                    "enabled": True,
+                },
+            },
+            ensure_ascii=False,
+            indent=2,
+        )
+    )

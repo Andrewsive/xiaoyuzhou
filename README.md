@@ -22,8 +22,15 @@ C:\Users\yichen\miniconda3\python.exe -m pip install -r requirements.txt
 
 3. Update `config.yaml`:
 
+- For Xiaoyuzhou podcast URLs, the pipeline will try the public web page first
 - Replace `rsshub.base_url` with your own RSSHub deployment for Xiaoyuzhou, or
 - Set `podcasts[].rss_url` directly if you already have a working RSS URL
+
+If you only have an episode URL, resolve it first:
+
+```bash
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline resolve-source https://www.xiaoyuzhoufm.com/episode/<episode-id>
+```
 
 ## Commands
 
@@ -42,5 +49,6 @@ C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline stats
 ## Notes
 
 - Public `rsshub.app` may return `403` for Xiaoyuzhou routes.
+- Xiaoyuzhou public podcast pages often expose only the latest batch of episodes in `__NEXT_DATA__`; for full backfill, prefer your own RSSHub or a direct RSS URL.
 - The new pipeline writes runtime data under `data/`.
 - The old one-off scripts are still present, but the new entrypoint is `python -m podcast_pipeline`.

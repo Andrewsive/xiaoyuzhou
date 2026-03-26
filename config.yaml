@@ -45,7 +45,7 @@ storage:
 
 podcasts:
   - display_name: talk_sanlian
-    source_url: https://www.xiaoyuzhoufm.com/podcast/5e280faf418a84a0461fa1eb
+    source_url: https://www.xiaoyuzhoufm.com/podcast/61e7b5314675a08411f51319
     # Optional: use a working RSS URL directly and bypass route generation.
     # rss_url: https://your-rsshub-host/xiaoyuzhou/podcast/5e280faf418a84a0461fa1eb
     enabled: true

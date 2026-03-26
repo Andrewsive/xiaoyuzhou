@@ -8,6 +8,7 @@ import requests
 from .config import AppConfig
 from .models import EpisodeCandidate, PodcastDefinition
 from .utils import ensure_directory, sha1_text
+from .xiaoyuzhou_web import XiaoyuzhouWebSource
 
 
 class RSSHubSource:
@@ -75,3 +76,28 @@ class RSSHubSource:
     def _save_feed_snapshot(self, podcast_id: str, xml_text: str) -> None:
         target_dir = ensure_directory(self.config.raw_rss_path / podcast_id)
         (target_dir / "latest.xml").write_text(xml_text, encoding="utf-8")
+
+
+class CompositeFeedSource:
+    def __init__(self, config: AppConfig):
+        self.config = config
+        self.rsshub = RSSHubSource(config)
+        self.web_source = XiaoyuzhouWebSource(user_agent=config.rsshub.user_agent)
+
+    def fetch_feed(self, podcast: PodcastDefinition) -> tuple[str, list[EpisodeCandidate]]:
+        errors: list[str] = []
+        if podcast.rss_url:
+            return self.rsshub.fetch_feed(podcast)
+
+        if "xiaoyuzhoufm.com" in podcast.source_url:
+            try:
+                return self.web_source.fetch_podcast(podcast)
+            except Exception as exc:
+                errors.append(f"xiaoyuzhou_web: {exc}")
+
+        try:
+            return self.rsshub.fetch_feed(podcast)
+        except Exception as exc:
+            errors.append(f"rsshub: {exc}")
+
+        raise RuntimeError("; ".join(errors))

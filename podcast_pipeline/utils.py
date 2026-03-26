@@ -9,6 +9,7 @@ from urllib.parse import urlparse
 
 
 XIAOYUZHOU_PODCAST_PATTERN = re.compile(r"/podcast/([a-zA-Z0-9]+)")
+XIAOYUZHOU_EPISODE_PATTERN = re.compile(r"/episode/([a-zA-Z0-9]+)")
 
 
 def utc_now_iso() -> str:
@@ -28,6 +29,13 @@ def extract_podcast_id(source_url: str) -> str:
     match = XIAOYUZHOU_PODCAST_PATTERN.search(source_url)
     if not match:
         raise ValueError(f"Could not extract Xiaoyuzhou podcast id from {source_url}")
+    return match.group(1)
+
+
+def extract_episode_id(source_url: str) -> str:
+    match = XIAOYUZHOU_EPISODE_PATTERN.search(source_url)
+    if not match:
+        raise ValueError(f"Could not extract Xiaoyuzhou episode id from {source_url}")
     return match.group(1)
 
 

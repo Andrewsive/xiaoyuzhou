@@ -18,7 +18,7 @@ from .db import (
     PipelineDB,
 )
 from .downloader import AudioDownloader
-from .feed_source import RSSHubSource
+from .feed_source import CompositeFeedSource
 from .indexer import VectorIndexer
 from .utils import ensure_directory, utc_now_iso
 
@@ -29,7 +29,7 @@ class PipelineRunner:
         self.config.ensure_directories()
         self.db = PipelineDB(config.database_path)
         self.db.init_schema()
-        self.source = RSSHubSource(config)
+        self.source = CompositeFeedSource(config)
         self.downloader = AudioDownloader(config.audio_path)
 
     def close(self) -> None:
