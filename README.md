@@ -52,6 +52,7 @@ C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline index --limit 1
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline run-once
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline retry-failed
 C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline stats
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline serve-agent --host 127.0.0.1 --port 8787
 ```
 
 ## Notes
@@ -60,3 +61,17 @@ C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline stats
 - Xiaoyuzhou public podcast pages often expose only the latest batch of episodes in `__NEXT_DATA__`; for full backfill, prefer your own RSSHub or a direct RSS URL.
 - The new pipeline writes runtime data under `data/`.
 - The old one-off scripts are still present, but the new entrypoint is `python -m podcast_pipeline`.
+
+## Agent Mount
+
+Run a local retrieval service for agents:
+
+```bash
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline serve-agent --host 127.0.0.1 --port 8787
+```
+
+Endpoints:
+
+- `GET /health`
+- `GET /v1/search?q=年轻化&top_k=3`
+- `POST /v1/retrieve` with JSON `{"query":"年轻化","top_k":3}`

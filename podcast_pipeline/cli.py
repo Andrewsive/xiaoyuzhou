@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from .agent_service import create_agent_app
 from .config import load_config
 from .pipeline import PipelineRunner
 from .xiaoyuzhou_web import XiaoyuzhouWebSource
@@ -175,3 +176,13 @@ def resolve_source(url: str = typer.Argument(..., help="Xiaoyuzhou episode or po
             indent=2,
         )
     )
+
+
+@app.command("serve-agent")
+def serve_agent(
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+    host: str = typer.Option("127.0.0.1"),
+    port: int = typer.Option(8787, min=1, max=65535),
+) -> None:
+    flask_app = create_agent_app(config)
+    flask_app.run(host=host, port=port)
