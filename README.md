@@ -1,6 +1,6 @@
 # Podcast Knowledge Pipeline
 
-This repository now contains a local MVP pipeline for turning podcast feeds into a retrieval-ready knowledge base.
+This repository contains a local MVP pipeline for turning podcast episodes into a retrieval-ready knowledge base.
 
 ## Setup
 
@@ -10,7 +10,7 @@ This repository now contains a local MVP pipeline for turning podcast feeds into
 C:\Users\yichen\miniconda3\python.exe -m pip install -r requirements.txt
 ```
 
-2. Copy `.env.example` to `.env` and fill in:
+2. Copy `.env.example` to `.env` and fill in the keys you plan to use:
 
 - `DASHSCOPE_API_KEY`
 - `LLM_API_KEY`
@@ -22,9 +22,9 @@ C:\Users\yichen\miniconda3\python.exe -m pip install -r requirements.txt
 
 3. Update `config.yaml`:
 
-- For Xiaoyuzhou podcast URLs, the pipeline will try the public web page first
+- For Xiaoyuzhou podcast URLs, the pipeline will try the public web page first.
 - Replace `rsshub.base_url` with your own RSSHub deployment for Xiaoyuzhou, or
-- Set `podcasts[].rss_url` directly if you already have a working RSS URL
+- Set `podcasts[].rss_url` directly if you already have a working RSS URL.
 - If no cloud keys are configured, the pipeline falls back to:
   - local Whisper ASR
   - heuristic transcript cleaning
@@ -80,6 +80,7 @@ Minimal client example:
 
 ```bash
 C:\Users\yichen\miniconda3\python.exe examples\agent_client_example.py
+C:\Users\yichen\miniconda3\python.exe examples\knowledge_agent_example.py
 ```
 
 Minimal `curl` example:
@@ -88,4 +89,10 @@ Minimal `curl` example:
 curl -X POST "http://127.0.0.1:8787/v1/retrieve" ^
   -H "Content-Type: application/json" ^
   -d "{\"query\":\"年轻化\",\"top_k\":3}"
+```
+
+Ask a question through the local knowledge agent:
+
+```bash
+C:\Users\yichen\miniconda3\python.exe -m podcast_pipeline agent-answer "Talk三联最近几期里，哪些内容谈到了年轻化？"
 ```

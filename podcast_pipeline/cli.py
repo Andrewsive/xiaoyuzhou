@@ -5,6 +5,7 @@ from pathlib import Path
 
 import typer
 
+from .knowledge_agent import answer_with_knowledge_base, print_agent_answer
 from .agent_service import create_agent_app
 from .config import load_config
 from .pipeline import PipelineRunner
@@ -186,3 +187,13 @@ def serve_agent(
 ) -> None:
     flask_app = create_agent_app(config)
     flask_app.run(host=host, port=port)
+
+
+@app.command("agent-answer")
+def agent_answer(
+    question: str = typer.Argument(...),
+    top_k: int = typer.Option(3, min=1, max=10),
+    config: Path = typer.Option(Path("config.yaml"), exists=True, dir_okay=False),
+) -> None:
+    payload = answer_with_knowledge_base(config_path=config, question=question, top_k=top_k)
+    typer.echo(print_agent_answer(payload))
