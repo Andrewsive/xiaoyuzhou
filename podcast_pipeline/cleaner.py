@@ -10,6 +10,11 @@ from .http_clients import OpenAICompatibleClient, parse_json_response
 from .models import CleanSegment, TranscriptSegment
 from .utils import getenv_required, sha1_text
 
+try:
+    from opencc import OpenCC
+except ImportError:  # pragma: no cover - optional dependency fallback
+    OpenCC = None
+
 
 SYSTEM_PROMPT = """You clean podcast transcripts for retrieval.
 Return strict JSON with this shape:
@@ -22,9 +27,49 @@ Requirements:
 - Remove filler words and obvious ASR glitches.
 - Keep facts, names, and intent faithful to the source.
 - Write in Simplified Chinese when the source is Chinese.
+- Preserve the speaker's meaning instead of rewriting the content.
 - Do not invent details.
 - Return JSON only.
 """
+
+_OPENCC = OpenCC("t2s") if OpenCC else None
+
+
+def to_simplified(text: str) -> str:
+    if not text:
+        return text
+    if _OPENCC is None:
+        return text
+    return _OPENCC.convert(text)
+
+
+def _default_model_for_base_url(base_url: str) -> str | None:
+    normalized = base_url.strip().lower()
+    if "dashscope.aliyuncs.com/compatible-mode/v1" in normalized:
+        return "qwen-plus"
+    if "api.openai.com/v1" in normalized:
+        return "gpt-4o-mini"
+    return None
+
+
+def _resolve_cleaner_settings(config: AppConfig) -> tuple[str, str, str] | None:
+    api_key = os.getenv(config.cleaner.api_key_env, "").strip()
+    base_url = os.getenv(config.cleaner.base_url_env, "").strip()
+    model = os.getenv(config.cleaner.model_env, "").strip()
+    if api_key and base_url and model:
+        return api_key, base_url.rstrip("/"), model
+
+    embedding_api_key = os.getenv(config.embedding.api_key_env, "").strip()
+    embedding_base_url = os.getenv(config.embedding.base_url_env, "").strip()
+    if not embedding_api_key:
+        return None
+
+    api_key = api_key or embedding_api_key
+    base_url = (base_url or embedding_base_url).rstrip("/")
+    model = model or _default_model_for_base_url(base_url) or config.cleaner.default_model
+    if api_key and base_url and model:
+        return api_key, base_url, model
+    return None
 
 
 def load_segments_from_transcript_payload(transcript_path: Path) -> list[TranscriptSegment]:
@@ -74,14 +119,16 @@ class TranscriptCleaner:
     def __init__(self, config: AppConfig):
         self.config = config
         provider = config.cleaner.provider.lower()
-        has_llm_key = bool(os.getenv(config.cleaner.api_key_env, "").strip())
-        self.mode = "heuristic" if provider == "heuristic" or (provider == "auto" and not has_llm_key) else "llm"
+        cleaner_settings = _resolve_cleaner_settings(config)
+        self.mode = "heuristic" if provider == "heuristic" or (provider == "auto" and not cleaner_settings) else "llm"
         self.client = None
+        self.model = None
         if self.mode == "llm":
-            self.client = OpenAICompatibleClient(
-                api_key=getenv_required(config.cleaner.api_key_env),
-                base_url=config.cleaner_base_url(),
-            )
+            if cleaner_settings is None:
+                raise RuntimeError("Cleaner is configured for LLM mode but no compatible API settings were found")
+            api_key, base_url, model = cleaner_settings
+            self.client = OpenAICompatibleClient(api_key=api_key, base_url=base_url)
+            self.model = model
 
     def clean_to_files(self, *, transcript_path: Path, jsonl_output_path: Path, md_output_path: Path) -> tuple[Path, Path]:
         segments = load_segments_from_transcript_payload(transcript_path)
@@ -114,8 +161,10 @@ class TranscriptCleaner:
     def _clean_group(self, group: list[TranscriptSegment]) -> CleanSegment:
         raw_text = "\n".join(f"[{seg.start_ms}-{seg.end_ms}] (speaker={seg.speaker}) {seg.text}" for seg in group)
         if self.mode == "llm":
+            if self.client is None or self.model is None:
+                raise RuntimeError("LLM cleaner is not initialized correctly")
             response = self.client.chat(
-                model=self.config.cleaner_model(),
+                model=self.model,
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
                     {"role": "user", "content": raw_text},
@@ -125,26 +174,30 @@ class TranscriptCleaner:
             parsed = parse_json_response(response)
         else:
             parsed = self._heuristic_clean(raw_text)
+
         speakers = sorted({segment.speaker for segment in group})
+        text = to_simplified(str(parsed["text"]).strip())
+        summary = to_simplified(str(parsed.get("summary", "")).strip())
+        keywords = [to_simplified(str(item).strip()) for item in parsed.get("keywords", []) if str(item).strip()]
         return CleanSegment(
             chunk_id=sha1_text("|".join(segment.segment_id for segment in group)),
-            text=parsed["text"].strip(),
+            text=text,
             start_ms=group[0].start_ms,
             end_ms=group[-1].end_ms,
             speaker=",".join(speakers),
-            keywords=[str(item).strip() for item in parsed.get("keywords", []) if str(item).strip()],
-            summary=parsed.get("summary", "").strip(),
+            keywords=keywords,
+            summary=summary,
         )
 
     def _heuristic_clean(self, text: str) -> dict[str, object]:
         cleaned = re.sub(r"\[(\d+)-(\d+)\]\s+\(speaker=.*?\)\s*", "", text)
-        cleaned = cleaned.replace("那个", "").replace("就是", "").replace("然后", " ")
+        cleaned = to_simplified(cleaned)
+        filler_pattern = r"\b(那个|就是说|然后|就是|其实|可能|你知道|呃|嗯|啊)\b"
+        cleaned = re.sub(filler_pattern, " ", cleaned)
         cleaned = re.sub(r"[ \t]+", " ", cleaned)
         cleaned = re.sub(r"\n{2,}", "\n", cleaned)
         cleaned = cleaned.strip()
-        summary = cleaned.split("。")[0].strip()
-        if not summary:
-            summary = cleaned[:80]
+        summary = cleaned.split("。")[0].strip() if "。" in cleaned else cleaned[:80]
         return {
             "text": cleaned,
             "summary": summary[:120],
