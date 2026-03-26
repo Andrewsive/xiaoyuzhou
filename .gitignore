@@ -1,0 +1,10 @@
+__pycache__/
+*.pyc
+.env
+.pytest_cache/
+data/
+audio/
+transcripts/
+podcast.db
+output.log
+next_data.json

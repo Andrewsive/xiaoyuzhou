@@ -1,0 +1,51 @@
+database:
+  path: data/pipeline.db
+
+rsshub:
+  # Replace with your own RSSHub deployment for Xiaoyuzhou routes.
+  base_url: https://rsshub.app
+  user_agent: Mozilla/5.0
+
+asr:
+  api_key_env: DASHSCOPE_API_KEY
+  base_url: https://dashscope.aliyuncs.com
+  model: fun-asr
+  poll_interval_seconds: 5
+  timeout_seconds: 7200
+  diarization_enabled: true
+  language_hints:
+    - zh
+    - en
+
+cleaner:
+  api_key_env: LLM_API_KEY
+  base_url_env: LLM_BASE_URL
+  model_env: LLM_MODEL
+  default_base_url: https://api.openai.com/v1
+  default_model: gpt-4o-mini
+  temperature: 0.2
+  max_input_chars: 3000
+
+embedding:
+  api_key_env: EMBEDDING_API_KEY
+  base_url_env: EMBEDDING_BASE_URL
+  model_env: EMBEDDING_MODEL
+  default_base_url: https://api.openai.com/v1
+  default_model: text-embedding-3-small
+  collection_name: podcast_knowledge
+  persist_path: data/vector/chroma
+
+storage:
+  base_dir: data
+  raw_rss_dir: raw/rss
+  audio_dir: audio
+  transcript_dir: transcripts
+  cleaned_dir: cleaned
+  logs_dir: logs
+
+podcasts:
+  - display_name: talk_sanlian
+    source_url: https://www.xiaoyuzhoufm.com/podcast/5e280faf418a84a0461fa1eb
+    # Optional: use a working RSS URL directly and bypass route generation.
+    # rss_url: https://your-rsshub-host/xiaoyuzhou/podcast/5e280faf418a84a0461fa1eb
+    enabled: true
