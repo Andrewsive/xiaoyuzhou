@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from pathlib import Path
 from typing import Any
 
@@ -9,6 +10,7 @@ from dotenv import load_dotenv
 
 from .agent_service import build_agent_payload
 from .config import load_config
+from .db import STATUS_INDEXED
 from .http_clients import OpenAICompatibleClient
 from .pipeline import PipelineRunner
 
@@ -71,6 +73,39 @@ def _truncate(text: str, limit: int = 160) -> str:
     return f"{normalized[:limit].rstrip()}..."
 
 
+def _is_overview_question(question: str) -> bool:
+    normalized = re.sub(r"\s+", "", question.lower())
+    overview_markers = (
+        "这几集",
+        "这5集",
+        "这五集",
+        "最近几集",
+        "所有已入库",
+        "全部已入库",
+        "逐集",
+        "分别讲了什么",
+        "分别说了什么",
+        "总览",
+        "概览",
+    )
+    return any(marker in normalized for marker in overview_markers)
+
+
+def _dedupe_hits_by_episode(raw_hits: list[dict[str, Any]], *, limit: int) -> list[dict[str, Any]]:
+    unique_hits: list[dict[str, Any]] = []
+    seen_episode_ids: set[str] = set()
+    for item in raw_hits:
+        episode_id = str(item.get("metadata", {}).get("episode_id", "")).strip()
+        if episode_id and episode_id in seen_episode_ids:
+            continue
+        if episode_id:
+            seen_episode_ids.add(episode_id)
+        unique_hits.append(item)
+        if len(unique_hits) >= limit:
+            break
+    return unique_hits
+
+
 def fallback_answer(payload: dict[str, Any]) -> str:
     results = payload.get("results", [])
     if not results:
@@ -106,7 +141,14 @@ def answer_with_knowledge_base(
     config = load_config(config_path)
     runner = PipelineRunner(config)
     try:
-        raw_hits = runner.search(query=question, top_k=top_k)
+        counts = runner.stats().get("counts", {})
+        indexed_episode_count = int(counts.get(STATUS_INDEXED, 0))
+        wants_overview = _is_overview_question(question)
+        desired_episodes = max(top_k, indexed_episode_count) if wants_overview and indexed_episode_count else top_k
+        candidate_hits = min(max(desired_episodes * 3, top_k), 30) if wants_overview else top_k
+        raw_hits = runner.search(query=question, top_k=candidate_hits)
+        if wants_overview:
+            raw_hits = _dedupe_hits_by_episode(raw_hits, limit=desired_episodes)
     finally:
         runner.close()
 
