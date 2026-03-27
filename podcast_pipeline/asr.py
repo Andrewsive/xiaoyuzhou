@@ -16,6 +16,33 @@ class DashScopeAsrProvider:
         self.config = config
         self.api_key = getenv_required(config.asr.api_key_env)
         self.base_url = config.asr.base_url.rstrip("/")
+        self.timeout = (20, 120)
+        self.max_attempts = 3
+
+    def _request(self, *, method: str, path: str, json_payload: dict | None = None) -> requests.Response:
+        last_error: Exception | None = None
+        for attempt in range(1, self.max_attempts + 1):
+            try:
+                response = requests.request(
+                    method,
+                    f"{self.base_url}{path}",
+                    headers={
+                        "Authorization": f"Bearer {self.api_key}",
+                        "Content-Type": "application/json",
+                        "X-DashScope-Async": "enable",
+                    },
+                    json=json_payload,
+                    timeout=self.timeout,
+                )
+                response.raise_for_status()
+                return response
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt == self.max_attempts:
+                    raise
+                time.sleep(attempt * 2)
+        assert last_error is not None
+        raise last_error
 
     def transcribe_episode(self, episode: dict, output_path: Path) -> Path:
         audio_url = episode["audio_url"]
@@ -29,7 +56,7 @@ class DashScopeAsrProvider:
                     f"DashScope subtask failed: {result.get('code', 'UNKNOWN')} {result.get('message', '')}"
                 )
             transcription_url = result["transcription_url"]
-            transcript_response = requests.get(transcription_url, timeout=60)
+            transcript_response = requests.get(transcription_url, timeout=self.timeout)
             transcript_response.raise_for_status()
             files.append(
                 {
@@ -52,21 +79,15 @@ class DashScopeAsrProvider:
         }
         if self.config.asr.speaker_count:
             parameters["speaker_count"] = self.config.asr.speaker_count
-        response = requests.post(
-            f"{self.base_url}/api/v1/services/audio/asr/transcription",
-            headers={
-                "Authorization": f"Bearer {self.api_key}",
-                "Content-Type": "application/json",
-                "X-DashScope-Async": "enable",
-            },
-            json={
+        response = self._request(
+            method="POST",
+            path="/api/v1/services/audio/asr/transcription",
+            json_payload={
                 "model": self.config.asr.model,
                 "input": {"file_urls": [audio_url]},
                 "parameters": parameters,
             },
-            timeout=60,
         )
-        response.raise_for_status()
         return response.json()["output"]["task_id"]
 
     def _wait_for_completion(self, task_id: str) -> dict:
@@ -74,16 +95,7 @@ class DashScopeAsrProvider:
         while True:
             if time.time() - started > self.config.asr.timeout_seconds:
                 raise TimeoutError(f"DashScope task {task_id} timed out")
-            response = requests.post(
-                f"{self.base_url}/api/v1/tasks/{task_id}",
-                headers={
-                    "Authorization": f"Bearer {self.api_key}",
-                    "Content-Type": "application/json",
-                    "X-DashScope-Async": "enable",
-                },
-                timeout=60,
-            )
-            response.raise_for_status()
+            response = self._request(method="POST", path=f"/api/v1/tasks/{task_id}")
             data = response.json()
             status = data["output"]["task_status"]
             if status == "SUCCEEDED":
