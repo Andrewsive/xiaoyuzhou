@@ -1,4 +1,6 @@
-from podcast_pipeline.agent_service import build_agent_payload, format_agent_context, normalize_hits
+from pathlib import Path
+
+from podcast_pipeline.agent_service import build_agent_payload, create_agent_app, format_agent_context, normalize_hits
 
 
 def test_build_agent_payload_formats_context() -> None:
@@ -51,3 +53,11 @@ def test_normalize_hits_handles_missing_timestamps() -> None:
     assert hits[0].start_ms is None
     assert hits[0].end_ms is None
     assert format_agent_context(hits).startswith("[1] EP")
+
+
+def test_agent_service_home_page_renders() -> None:
+    app = create_agent_app(Path("config.yaml"))
+    client = app.test_client()
+    response = client.get("/")
+    assert response.status_code == 200
+    assert "播客知识库本地服务" in response.get_data(as_text=True)

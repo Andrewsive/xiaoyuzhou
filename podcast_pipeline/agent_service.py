@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, render_template_string, request
 
 from .config import AppConfig, load_config
 from .pipeline import PipelineRunner
@@ -84,7 +84,52 @@ def build_agent_payload(raw_hits: list[dict[str, Any]], *, query: str) -> dict[s
 
 def create_agent_app(config_path: Path) -> Flask:
     app = Flask(__name__)
+    app.json.ensure_ascii = False
     config = load_config(config_path)
+
+    @app.get("/")
+    def home() -> Any:
+        return render_template_string(
+            """
+            <!doctype html>
+            <html lang="zh-CN">
+              <head>
+                <meta charset="utf-8">
+                <title>Podcast Knowledge Base Demo</title>
+                <style>
+                  body { font-family: "Microsoft YaHei", sans-serif; margin: 40px; line-height: 1.6; color: #1f2937; }
+                  h1 { margin-bottom: 8px; }
+                  code, pre { background: #f3f4f6; padding: 2px 6px; border-radius: 6px; }
+                  pre { padding: 12px; overflow: auto; }
+                  a { color: #2563eb; text-decoration: none; }
+                  .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-top: 16px; }
+                </style>
+              </head>
+              <body>
+                <h1>播客知识库本地服务</h1>
+                <p>服务已经启动成功。这个页面是给人看的演示入口，真正给程序调用的是下面这些接口。</p>
+
+                <div class="card">
+                  <h2>可直接打开</h2>
+                  <p><a href="/health" target="_blank">/health</a></p>
+                  <p><a href="/v1/search?q=年轻化&top_k=5" target="_blank">/v1/search?q=年轻化&top_k=5</a></p>
+                  <p><a href="/v1/search?q=这几集播客讲了哪些内容&top_k=5" target="_blank">/v1/search?q=这几集播客讲了哪些内容&top_k=5</a></p>
+                </div>
+
+                <div class="card">
+                  <h2>给 Agent 调用</h2>
+                  <pre>POST /v1/retrieve
+Content-Type: application/json
+
+{
+  "query": "这几集播客讲了哪些内容",
+  "top_k": 5
+}</pre>
+                </div>
+              </body>
+            </html>
+            """
+        )
 
     @app.get("/health")
     def health() -> Any:
