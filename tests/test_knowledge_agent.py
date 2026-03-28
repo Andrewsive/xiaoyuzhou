@@ -1,5 +1,6 @@
 from podcast_pipeline.knowledge_agent import (
     _dedupe_hits_by_episode,
+    _format_answer_evidence,
     _is_overview_question,
     _resolve_llm_settings,
     fallback_answer,
@@ -52,3 +53,20 @@ def test_dedupe_hits_by_episode_keeps_one_hit_per_episode() -> None:
     assert len(deduped) == 2
     assert deduped[0]["metadata"]["episode_id"] == "ep-1"
     assert deduped[1]["metadata"]["episode_id"] == "ep-2"
+
+
+def test_format_answer_evidence_prefers_structured_fields() -> None:
+    payload = {
+        "results": [
+            {
+                "episode_title": "EP243 蒋奇明x李雪琴x双雪涛",
+                "summary": "本期围绕电影改编展开。",
+                "text": "很长的原文片段",
+                "source_url": "https://example.com/ep243",
+            }
+        ]
+    }
+    evidence = _format_answer_evidence(payload)
+    assert "标题: EP243 蒋奇明x李雪琴x双雪涛" in evidence
+    assert "摘要: 本期围绕电影改编展开。" in evidence
+    assert "来源: https://example.com/ep243" in evidence

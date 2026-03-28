@@ -21,6 +21,9 @@ Rules:
 - If the context is insufficient, say so clearly.
 - Keep the answer concise and cite episode titles when possible.
 - Answer in Simplified Chinese when the question is Chinese.
+- Treat structured metadata such as episode titles as higher-priority evidence than inferred guesses from transcript snippets.
+- Do not "correct" person names, titles, or works unless the provided evidence explicitly proves they are wrong.
+- If the title and snippet conflict, report the conflict instead of choosing one side as a factual correction.
 """
 
 
@@ -71,6 +74,23 @@ def _truncate(text: str, limit: int = 160) -> str:
     if len(normalized) <= limit:
         return normalized
     return f"{normalized[:limit].rstrip()}..."
+
+
+def _format_answer_evidence(payload: dict[str, Any]) -> str:
+    lines: list[str] = []
+    for index, item in enumerate(payload.get("results", []), start=1):
+        title = str(item.get("episode_title", "")).strip()
+        summary = str(item.get("summary", "")).strip()
+        snippet = str(item.get("text", "")).strip()
+        source_url = str(item.get("source_url", "")).strip()
+        evidence = summary or _truncate(snippet, limit=300)
+        lines.append(f"[{index}] 标题: {title}")
+        if evidence:
+            lines.append(f"摘要: {evidence}")
+        if source_url:
+            lines.append(f"来源: {source_url}")
+        lines.append("")
+    return "\n".join(lines).strip()
 
 
 def _is_overview_question(question: str) -> bool:
@@ -167,8 +187,11 @@ def answer_with_knowledge_base(
             "role": "user",
             "content": (
                 f"用户问题：{question}\n\n"
-                f"知识库上下文：\n{payload.get('context', '')}\n\n"
-                "请基于这些检索结果直接回答。如果证据不足，请明确说明。"
+                f"结构化检索结果：\n{_format_answer_evidence(payload)}\n\n"
+                f"原始知识库上下文：\n{payload.get('context', '')}\n\n"
+                "请基于这些检索结果直接回答。\n"
+                "优先信任标题和摘要，不要擅自纠正人名、片名或节目标题。\n"
+                "如果证据之间存在冲突，请明确写出“检索结果存在冲突”，不要自行裁定。"
             ),
         },
     ]
